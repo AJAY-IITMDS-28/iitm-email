@@ -1,39 +1,33 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from typing import Optional
-import openai
-import os
+from bs4 import BeautifulSoup
+import requests
 
 app = FastAPI()
 
-# Enable CORS
+# Allow CORS from any origin
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["*"],
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
 
-# Load TypeScript Book into memory (sample mock data for now)
-docs = [
-    {
-        "excerpt": "`=>` is affectionately called the *fat arrow* in ES6.",
-        "source": "https://github.com/basarat/typescript-book/blob/master/docs/arrow-functions.md"
-    },
-    {
-        "excerpt": "`!!` is a trick to convert any value into an explicit boolean.",
-        "source": "https://github.com/basarat/typescript-book/blob/master/docs/truthy.md"
-    }
-]
+@app.get("/api/outline")
+def get_outline(country: str = Query(..., description="Country name")):
+    url = f"https://en.wikipedia.org/wiki/{country.replace(' ', '_')}"
+    response = requests.get(url)
+    
+    if response.status_code != 200:
+        return {"error": f"Could not fetch Wikipedia page for {country}"}
 
-@app.get("/search")
-async def search(q: Optional[str] = ""):
-    query = q.lower()
-    for doc in docs:
-        if "fat arrow" in doc["excerpt"].lower() and "=>" in query:
-            return {"answer": doc["excerpt"], "sources": doc["source"]}
-        if "!!" in query or "boolean" in query:
-            return {"answer": doc["excerpt"], "sources": doc["source"]}
-    return {"answer": "No relevant excerpt found", "sources": ""}
+    soup = BeautifulSoup(response.text, 'html.parser')
+    headings = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
 
+    markdown = ["## Contents"]
+    for tag in headings:
+        level = int(tag.name[1])
+        title = tag.get_text().strip()
+        markdown.append(f"{'#' * level} {title}")
+
+    return {"outline": "\n\n".join(markdown)}
