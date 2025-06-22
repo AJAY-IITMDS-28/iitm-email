@@ -1,0 +1,24 @@
+name: Daily Automated Commit
+
+on:
+  schedule:
+    - cron: '15 2 * * *' # Runs every day at 02:15 UTC
+
+jobs:
+  daily-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update status file (24f2006853@ds.study.iitm.ac.in)
+        run: |
+          echo "Last update: $(date -u)" > .github/daily-status.txt
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/daily-status.txt
+          git commit -m "Automated daily update [skip ci]" || echo "No changes to commit"
+          git push
